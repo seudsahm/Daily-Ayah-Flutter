@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'dart:ui';
 import '../models/favorite_ayah.dart';
 import '../services/favorites_service.dart';
 import '../services/share_service.dart';
 import '../models/ayah_with_surah.dart';
 import '../models/surah.dart';
 import '../models/ayah.dart';
+import '../widgets/islamic_pattern_painter.dart';
+import '../widgets/ornamental_divider.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -34,12 +37,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   Future<void> _removeFavorite(FavoriteAyah favorite) async {
     await _favoritesService.removeFavorite(favorite.surahId, favorite.ayahId);
-
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Removed from favorites'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: const Text('Removed from favorites'),
+          backgroundColor: Theme.of(context).colorScheme.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -47,7 +49,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   void _shareFavorite(FavoriteAyah favorite) {
-    // Convert FavoriteAyah to AyahWithSurah for sharing
     final ayahWithSurah = AyahWithSurah(
       surah: Surah(
         id: favorite.surahId,
@@ -64,112 +65,91 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         translation: favorite.translation,
       ),
     );
-
     ShareService.shareAyah(ayahWithSurah);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: const Text(
-          'Favorites',
-          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          if (!_isLoading)
+      body: CustomScrollView(
+        slivers: [
+          _buildSliverAppBar(theme),
+          if (_isLoading)
+            const SliverFillRemaining(
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else
             ValueListenableBuilder<Box<FavoriteAyah>>(
               valueListenable: _favoritesService.listenable,
               builder: (context, box, _) {
-                final count = box.length;
-                if (count == 0) return const SizedBox.shrink();
-
-                return Padding(
-                  padding: const EdgeInsets.only(right: 16.0),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
-                        ),
-                      ),
-                      child: Text(
-                        '$count',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
+                final favorites = _favoritesService.getAllFavorites();
+                if (favorites.isEmpty) {
+                  return SliverFillRemaining(child: _buildEmptyState(theme));
+                }
+                return SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final favorite = favorites[index];
+                      return _FavoriteCard(
+                        favorite: favorite,
+                        onRemove: () => _removeFavorite(favorite),
+                        onShare: () => _shareFavorite(favorite),
+                        index: index,
+                      );
+                    }, childCount: favorites.length),
                   ),
                 );
               },
             ),
         ],
       ),
-      body: Stack(
-        children: [
-          // Background Gradient
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  colorScheme.primary,
-                  colorScheme.secondary,
-                  theme.scaffoldBackgroundColor,
-                ],
-                stops: const [0.0, 0.2, 0.5],
+    );
+  }
+
+  Widget _buildSliverAppBar(ThemeData theme) {
+    return SliverAppBar(
+      expandedHeight: 200.0,
+      floating: false,
+      pinned: true,
+      backgroundColor: theme.colorScheme.primary,
+      flexibleSpace: FlexibleSpaceBar(
+        title: const Text(
+          'Favorites',
+          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+        ),
+        centerTitle: true,
+        background: Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    theme.colorScheme.primary,
+                    theme.colorScheme.secondary,
+                  ],
+                ),
               ),
             ),
-          ),
-
-          SafeArea(
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
-                  )
-                : ValueListenableBuilder<Box<FavoriteAyah>>(
-                    valueListenable: _favoritesService.listenable,
-                    builder: (context, box, _) {
-                      final favorites = _favoritesService.getAllFavorites();
-
-                      if (favorites.isEmpty) {
-                        return _buildEmptyState(theme);
-                      }
-
-                      return ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: favorites.length,
-                        itemBuilder: (context, index) {
-                          final favorite = favorites[index];
-                          return _FavoriteCard(
-                            favorite: favorite,
-                            onRemove: () => _removeFavorite(favorite),
-                            onShare: () => _shareFavorite(favorite),
-                          );
-                        },
-                      );
-                    },
-                  ),
-          ),
-        ],
+            CustomPaint(
+              painter: IslamicPatternPainter(color: Colors.white, opacity: 0.1),
+            ),
+            Positioned(
+              bottom: -20,
+              right: -20,
+              child: Icon(
+                Icons.favorite,
+                size: 150,
+                color: Colors.white.withOpacity(0.05),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -182,24 +162,24 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: theme.colorScheme.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.favorite_border,
                 size: 64,
-                color: Colors.white70,
+                color: theme.colorScheme.primary.withOpacity(0.5),
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'No Favorites Yet',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: theme.textTheme.titleLarge?.color,
               ),
             ),
             const SizedBox(height: 12),
@@ -208,7 +188,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.white.withOpacity(0.8),
+                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
               ),
             ),
           ],
@@ -222,130 +202,160 @@ class _FavoriteCard extends StatelessWidget {
   final FavoriteAyah favorite;
   final VoidCallback onRemove;
   final VoidCallback onShare;
+  final int index;
 
   const _FavoriteCard({
     required this.favorite,
     required this.onRemove,
     required this.onShare,
+    required this.index,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
-    return Card(
-      elevation: 4,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header with Reference and Actions
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    favorite.reference,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.primary,
-                    ),
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 500 + (index * 100)),
+      curve: Curves.easeOut,
+      builder: (context, value, child) {
+        return Transform.translate(
+          offset: Offset(0, 50 * (1 - value)),
+          child: Opacity(opacity: value, child: child),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 20),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
+            children: [
+              Positioned(
+                top: -50,
+                right: -50,
+                child: Opacity(
+                  opacity: 0.05,
+                  child: Image.asset(
+                    'assets/images/islamic_pattern.png', // Fallback or use custom painter if asset missing
+                    width: 200,
+                    height: 200,
+                    errorBuilder: (_, __, ___) => const SizedBox(),
                   ),
                 ),
-                Row(
+              ),
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.share_outlined, size: 20),
-                      color: colorScheme.secondary,
-                      onPressed: onShare,
-                      tooltip: 'Share',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 16),
-                    IconButton(
-                      icon: const Icon(Icons.favorite, size: 20),
-                      color: Colors.red,
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Remove Favorite'),
-                            content: const Text(
-                              'Are you sure you want to remove this ayah from favorites?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  onRemove();
-                                },
-                                child: const Text(
-                                  'Remove',
-                                  style: TextStyle(color: Colors.red),
-                                ),
-                              ),
-                            ],
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
                           ),
-                        );
-                      },
-                      tooltip: 'Remove',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            favorite.reference,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.share_outlined),
+                              color: theme.colorScheme.secondary,
+                              onPressed: onShare,
+                              tooltip: 'Share',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.favorite),
+                              color: Colors.red,
+                              onPressed: () => _confirmRemove(context),
+                              tooltip: 'Remove',
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      favorite.arabicText,
+                      textAlign: TextAlign.center,
+                      textDirection: TextDirection.rtl,
+                      style: const TextStyle(
+                        fontFamily: 'Amiri',
+                        fontSize: 28,
+                        height: 2.2,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    OrnamentalDivider(color: theme.colorScheme.tertiary),
+                    const SizedBox(height: 20),
+                    Text(
+                      favorite.translation,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        height: 1.6,
+                        color: theme.textTheme.bodyLarge?.color?.withOpacity(
+                          0.8,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // Arabic text
-            Text(
-              favorite.arabicText,
-              style: TextStyle(
-                fontFamily: 'Amiri',
-                fontSize: 26,
-                height: 2.0,
-                fontWeight: FontWeight.w600,
-                color: colorScheme.primary,
               ),
-              textAlign: TextAlign.right,
-              textDirection: TextDirection.rtl,
-            ),
-
-            const SizedBox(height: 16),
-            Divider(color: Colors.grey.withOpacity(0.2)),
-            const SizedBox(height: 16),
-
-            // Translation
-            Text(
-              favorite.translation,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontSize: 16,
-                height: 1.6,
-                color: theme.textTheme.bodyLarge?.color?.withOpacity(0.8),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  void _confirmRemove(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Favorite'),
+        content: const Text('Remove this ayah from your favorites?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              onRemove();
+            },
+            child: const Text('Remove', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }

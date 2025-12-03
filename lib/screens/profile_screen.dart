@@ -7,6 +7,7 @@ import '../models/user_stats.dart';
 import '../models/badge.dart' as model;
 import '../widgets/islamic_pattern_painter.dart';
 import '../widgets/ornamental_divider.dart';
+import '../widgets/badge_reveal_sheet.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -454,92 +455,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(32),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: badge.isUnlocked
-                    ? Colors.orange.shade50
-                    : Colors.grey.shade100,
-                boxShadow: badge.isUnlocked
-                    ? [
-                        BoxShadow(
-                          color: Colors.orange.withOpacity(0.3),
-                          blurRadius: 20,
-                          spreadRadius: 5,
-                        ),
-                      ]
-                    : null,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                badge.isUnlocked ? badge.icon : '🔒',
-                style: const TextStyle(fontSize: 50),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              badge.name,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              badge.description,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-                height: 1.5,
-              ),
-            ),
-            if (badge.isUnlocked && badge.unlockedDate != null) ...[
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.green.shade200),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      size: 16,
-                      color: Colors.green.shade700,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Unlocked on ${DateFormat.yMMMd().format(badge.unlockedDate!)}',
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
+      isScrollControlled: true,
+      builder: (context) => BadgeRevealSheet(badge: badge),
     );
   }
 }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'dart:ui';
 import '../models/collection.dart';
 import '../services/collections_service.dart';
 import 'collection_detail_screen.dart';
+import '../widgets/islamic_pattern_painter.dart';
 
 class CollectionsScreen extends StatefulWidget {
   const CollectionsScreen({super.key});
@@ -30,16 +32,24 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
   void _showCreateDialog() {
     final controller = TextEditingController();
+    final theme = Theme.of(context);
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('New Collection'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text(
+          'New Collection',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Collection Name',
             hintText: 'e.g., Daily Favorites',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: theme.colorScheme.surface.withOpacity(0.5),
           ),
           autofocus: true,
         ),
@@ -48,7 +58,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () async {
               if (controller.text.trim().isNotEmpty) {
                 await _collectionsService.createCollection(
@@ -57,6 +67,13 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                 if (context.mounted) Navigator.pop(context);
               }
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
             child: const Text('Create'),
           ),
         ],
@@ -67,120 +84,140 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: const Text(
-          'Collections',
-          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Stack(
-        children: [
-          // Background Gradient
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  colorScheme.primary,
-                  colorScheme.secondary,
-                  theme.scaffoldBackgroundColor,
-                ],
-                stops: const [0.0, 0.2, 0.5],
-              ),
-            ),
-          ),
+      body: CustomScrollView(
+        slivers: [
+          _buildSliverAppBar(theme),
+          if (_isLoading)
+            const SliverFillRemaining(
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else
+            ValueListenableBuilder<Box<Collection>>(
+              valueListenable: _collectionsService.listenable,
+              builder: (context, box, _) {
+                final collections = _collectionsService.getAllCollections();
 
-          SafeArea(
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
-                  )
-                : ValueListenableBuilder<Box<Collection>>(
-                    valueListenable: _collectionsService.listenable,
-                    builder: (context, box, _) {
-                      final collections = _collectionsService
-                          .getAllCollections();
+                if (collections.isEmpty) {
+                  return SliverFillRemaining(child: _buildEmptyState(theme));
+                }
 
-                      if (collections.isEmpty) {
-                        return _buildEmptyState(theme);
-                      }
-
-                      return ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: collections.length,
-                        itemBuilder: (context, index) {
-                          final collection = collections[index];
-                          return _CollectionCard(
-                            collection: collection,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => CollectionDetailScreen(
-                                    collection: collection,
-                                  ),
-                                ),
-                              );
-                            },
-                            onDelete: () async {
-                              final confirm = await showDialog<bool>(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Delete Collection'),
-                                  content: Text(
-                                    'Delete "${collection.name}"? Ayahs will not be deleted.',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, false),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, true),
-                                      child: const Text(
-                                        'Delete',
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-
-                              if (confirm == true) {
-                                await _collectionsService.deleteCollection(
-                                  collection.id,
-                                );
-                              }
-                            },
+                return SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final collection = collections[index];
+                      return _CollectionCard(
+                        collection: collection,
+                        index: index,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CollectionDetailScreen(
+                                collection: collection,
+                              ),
+                            ),
                           );
                         },
+                        onDelete: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              title: const Text('Delete Collection'),
+                              content: Text(
+                                'Delete "${collection.name}"? Ayahs will not be deleted.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text(
+                                    'Delete',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirm == true) {
+                            await _collectionsService.deleteCollection(
+                              collection.id,
+                            );
+                          }
+                        },
                       );
-                    },
+                    }, childCount: collections.length),
                   ),
-          ),
+                );
+              },
+            ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showCreateDialog,
-        backgroundColor: colorScheme.primary,
+        backgroundColor: theme.colorScheme.primary,
         foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
+        elevation: 4,
+        icon: const Icon(Icons.add_rounded),
         label: const Text(
           'New Collection',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        elevation: 8,
+      ),
+    );
+  }
+
+  Widget _buildSliverAppBar(ThemeData theme) {
+    return SliverAppBar(
+      expandedHeight: 200.0,
+      floating: false,
+      pinned: true,
+      backgroundColor: theme.colorScheme.primary,
+      flexibleSpace: FlexibleSpaceBar(
+        title: const Text(
+          'Collections',
+          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+        ),
+        centerTitle: true,
+        background: Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    theme.colorScheme.primary,
+                    theme.colorScheme.secondary,
+                  ],
+                ),
+              ),
+            ),
+            CustomPaint(
+              painter: IslamicPatternPainter(color: Colors.white, opacity: 0.1),
+            ),
+            Positioned(
+              bottom: -20,
+              right: -20,
+              child: Icon(
+                Icons.collections_bookmark,
+                size: 150,
+                color: Colors.white.withOpacity(0.05),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -193,24 +230,24 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: theme.colorScheme.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.collections_bookmark,
+              child: Icon(
+                Icons.collections_bookmark_outlined,
                 size: 64,
-                color: Colors.white70,
+                color: theme.colorScheme.primary.withOpacity(0.5),
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'No Collections Yet',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: theme.textTheme.titleLarge?.color,
               ),
             ),
             const SizedBox(height: 12),
@@ -219,7 +256,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.white.withOpacity(0.8),
+                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
               ),
             ),
           ],
@@ -233,65 +270,112 @@ class _CollectionCard extends StatelessWidget {
   final Collection collection;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final int index;
 
   const _CollectionCard({
     required this.collection,
     required this.onTap,
     required this.onDelete,
+    required this.index,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
-    return Card(
-      elevation: 4,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [colorScheme.primary, colorScheme.secondary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 500 + (index * 100)),
+      curve: Curves.easeOut,
+      builder: (context, value, child) {
+        return Transform.translate(
+          offset: Offset(0, 50 * (1 - value)),
+          child: Opacity(opacity: value, child: child),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(24),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          theme.colorScheme.primary,
+                          theme.colorScheme.secondary,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.colorScheme.primary.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.folder_open,
+                      color: Colors.white,
+                      size: 28,
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(Icons.folder, color: Colors.white, size: 28),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      collection.name,
-                      style: theme.textTheme.titleLarge?.copyWith(fontSize: 18),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          collection.name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${collection.ayahKeys.length} ayah${collection.ayahKeys.length == 1 ? '' : 's'}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: theme.textTheme.bodyMedium?.color
+                                ?.withOpacity(0.6),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${collection.ayahKeys.length} ayah${collection.ayahKeys.length == 1 ? '' : 's'}',
-                      style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
-                    ),
-                  ],
-                ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    color: Colors.red.shade300,
+                    onPressed: onDelete,
+                    tooltip: 'Delete',
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+                ],
               ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline),
-                color: Colors.red.shade400,
-                onPressed: onDelete,
-                tooltip: 'Delete',
-              ),
-            ],
+            ),
           ),
         ),
       ),

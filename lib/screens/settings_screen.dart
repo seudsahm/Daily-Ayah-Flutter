@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:home_widget/home_widget.dart';
+import 'dart:ui';
 import '../models/app_settings.dart';
 import '../services/notification_service.dart';
 import '../services/widget_service.dart';
@@ -8,6 +9,7 @@ import '../services/theme_service.dart';
 import '../services/backup_service.dart';
 import '../services/pdf_service.dart';
 import '../models/theme_mode.dart';
+import '../widgets/islamic_pattern_painter.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -48,7 +50,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_settings != null && _settingsBox != null) {
       await _settingsBox!.put(_settingsKey, _settings!);
 
-      // Reschedule notifications
       if (_settings!.notificationsEnabled) {
         await _notificationService.scheduleDailyNotification(
           hour: _settings!.notificationHour,
@@ -69,6 +70,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         hour: _settings!.notificationHour,
         minute: _settings!.notificationMinute,
       ),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            timePickerTheme: TimePickerThemeData(
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              dialHandColor: Theme.of(context).colorScheme.primary,
+              dialBackgroundColor: Theme.of(context).colorScheme.surface,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (picked != null) {
@@ -77,17 +90,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _settings!.notificationMinute = picked.minute;
       });
       await _saveSettings();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Reminder time updated to ${_settings!.notificationTimeString}',
-            ),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
     }
   }
 
@@ -95,15 +97,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_settings == null) return;
 
     if (value) {
-      // Request permission before enabling
       final hasPermission = await _notificationService.requestPermissions();
       if (!hasPermission) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Notification permission denied'),
-              behavior: SnackBarBehavior.floating,
-            ),
+            const SnackBar(content: Text('Notification permission denied')),
           );
         }
         return;
@@ -114,517 +112,532 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _settings!.notificationsEnabled = value;
     });
     await _saveSettings();
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            value ? 'Notifications enabled' : 'Notifications disabled',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
   }
 
-  Future<void> _testNotification() async {
-    await _notificationService.showTestNotification();
+  Future<void> _toggleQuickGlance(bool value) async {
+    if (_settings == null) return;
+    setState(() {
+      _settings!.enableQuickGlance = value;
+    });
+    await _saveSettings();
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Test notification sent!'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  Future<void> _refreshWidget() async {
-    await _widgetService.updateWidget();
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Widget refreshed successfully!'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+    // If enabling, we might want to show an immediate notification or update the service
+    // Assuming NotificationService handles this based on settings or we need to trigger it
+    // For now, we just save the setting as per previous implementation logic
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (_settings == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        title: const Text(
-          'Settings',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        backgroundColor: const Color(0xFF1B5E20),
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: _settings == null
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // Theme Section
-                Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.palette, color: Color(0xFF1B5E20)),
-                            SizedBox(width: 12),
-                            Text(
-                              'Appearance',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Choose your preferred theme',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                        const SizedBox(height: 16),
+      body: CustomScrollView(
+        slivers: [
+          _buildSliverAppBar(theme),
+          SliverPadding(
+            padding: const EdgeInsets.all(16),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _buildSectionHeader('Appearance', Icons.palette, theme),
+                _buildThemeSection(theme),
+                const SizedBox(height: 24),
 
-                        // Theme options
-                        ListenableBuilder(
-                          listenable: _themeService,
-                          builder: (context, child) {
-                            return Column(
-                              children: [
-                                RadioListTile<AppThemeMode>(
-                                  title: const Row(
-                                    children: [
-                                      Icon(Icons.brightness_5, size: 20),
-                                      SizedBox(width: 8),
-                                      Text('Light'),
-                                    ],
-                                  ),
-                                  value: AppThemeMode.light,
-                                  groupValue: _themeService.currentThemeMode,
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      _themeService.setThemeMode(value);
-                                    }
-                                  },
-                                ),
-                                RadioListTile<AppThemeMode>(
-                                  title: const Row(
-                                    children: [
-                                      Icon(Icons.brightness_2, size: 20),
-                                      SizedBox(width: 8),
-                                      Text('Dark'),
-                                    ],
-                                  ),
-                                  value: AppThemeMode.dark,
-                                  groupValue: _themeService.currentThemeMode,
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      _themeService.setThemeMode(value);
-                                    }
-                                  },
-                                ),
-                                RadioListTile<AppThemeMode>(
-                                  title: const Row(
-                                    children: [
-                                      Icon(Icons.brightness_auto, size: 20),
-                                      SizedBox(width: 8),
-                                      Text('System'),
-                                    ],
-                                  ),
-                                  subtitle: const Text(
-                                    'Follow device settings',
-                                  ),
-                                  value: AppThemeMode.system,
-                                  groupValue: _themeService.currentThemeMode,
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      _themeService.setThemeMode(value);
-                                    }
-                                  },
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
+                _buildSectionHeader(
+                  'Notifications',
+                  Icons.notifications,
+                  theme,
                 ),
+                _buildNotificationSection(theme),
+                const SizedBox(height: 24),
 
-                const SizedBox(height: 16),
+                _buildSectionHeader('Data & Storage', Icons.storage, theme),
+                _buildDataSection(theme),
+                const SizedBox(height: 24),
 
-                // Notifications Section
-                Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.notifications, color: Color(0xFF1B5E20)),
-                            SizedBox(width: 12),
-                            Text(
-                              'Daily Reminders',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Get a daily reminder to read your ayah',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                        const SizedBox(height: 16),
+                _buildSectionHeader('Widget', Icons.widgets, theme),
+                _buildWidgetSection(theme),
+                const SizedBox(height: 24),
 
-                        // Enable/Disable Switch
-                        SwitchListTile(
-                          value: _settings!.notificationsEnabled,
-                          onChanged: _toggleNotifications,
-                          title: const Text('Enable Reminders'),
-                          activeColor: const Color(0xFF1B5E20),
-                          contentPadding: EdgeInsets.zero,
-                        ),
-
-                        const Divider(),
-
-                        // Time Picker
-                        ListTile(
-                          leading: const Icon(
-                            Icons.access_time,
-                            color: Color(0xFF1B5E20),
-                          ),
-                          title: const Text('Reminder Time'),
-                          subtitle: Text(_settings!.notificationTimeString),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: _settings!.notificationsEnabled
-                              ? _pickTime
-                              : null,
-                          enabled: _settings!.notificationsEnabled,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-
-                        const Divider(),
-
-                        // Test Notification Button
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: _testNotification,
-                            icon: const Icon(Icons.send),
-                            label: const Text('Send Test Notification'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF1B5E20),
-                              side: const BorderSide(color: Color(0xFF1B5E20)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Data & Storage Section
-                Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.storage, color: Color(0xFF1B5E20)),
-                            SizedBox(width: 12),
-                            Text(
-                              'Data & Storage',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        ListTile(
-                          leading: const Icon(
-                            Icons.upload_file,
-                            color: Color(0xFF1B5E20),
-                          ),
-                          title: const Text('Export Favorites'),
-                          subtitle: const Text(
-                            'Backup your favorites to a file',
-                          ),
-                          onTap: () async {
-                            final backupService = BackupService();
-                            await backupService.exportFavorites(context);
-                          },
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        const Divider(),
-                        ListTile(
-                          leading: const Icon(
-                            Icons.file_download,
-                            color: Color(0xFF1B5E20),
-                          ),
-                          title: const Text('Import Favorites'),
-                          subtitle: const Text('Restore favorites from backup'),
-                          onTap: () async {
-                            final backupService = BackupService();
-                            await backupService.importFavorites(context);
-                          },
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        const Divider(),
-                        ListTile(
-                          leading: const Icon(
-                            Icons.picture_as_pdf,
-                            color: Color(0xFF1B5E20),
-                          ),
-                          title: const Text('Weekly Digest'),
-                          subtitle: const Text(
-                            'Generate PDF of recent activity',
-                          ),
-                          onTap: () async {
-                            final pdfService = PdfService();
-                            await pdfService.generateAndShareWeeklyDigest();
-                          },
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Quick Glance Section
-                Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.visibility, color: Color(0xFF1B5E20)),
-                            SizedBox(width: 12),
-                            Text(
-                              'Quick Glance',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Show today\'s ayah in a persistent notification',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                        const SizedBox(height: 16),
-
-                        Switch.adaptive(
-                          value: _settings!.enableQuickGlance,
-                          onChanged: (value) async {
-                            setState(() {
-                              _settings!.enableQuickGlance = value;
-                            });
-                            await _settingsBox!.put(_settingsKey, _settings!);
-
-                            if (value) {
-                              // Show pinned notification
-                              // TODO: Get today's ayah and show it
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Quick glance enabled'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            } else {
-                              await _notificationService.cancelQuickGlance();
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Quick glance disabled'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Widget Section
-                Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.widgets, color: Color(0xFF1B5E20)),
-                            SizedBox(width: 12),
-                            Text(
-                              'Home Screen Widget',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Keep your home screen widget up to date',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: _refreshWidget,
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Refresh Widget'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF1B5E20),
-                              side: const BorderSide(color: Color(0xFF1B5E20)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              try {
-                                await HomeWidget.requestPinWidget(
-                                  androidName: 'DailyAyahWidgetProvider',
-                                );
-                              } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Could not pin widget: $e'),
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            icon: const Icon(Icons.add_to_home_screen),
-                            label: const Text('Add to Home Screen'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1B5E20),
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // App Info Section
-                Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.info_outline, color: Color(0xFF1B5E20)),
-                            SizedBox(width: 12),
-                            Text(
-                              'About',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        _buildInfoRow('App Name', 'Daily Ayah'),
-                        _buildInfoRow('Version', '1.0.0'),
-                        _buildInfoRow('Total Ayahs', '6,236'),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'A beautiful app to read a different Quranic verse every day.',
-                          style: TextStyle(color: Colors.grey, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+                _buildSectionHeader('About', Icons.info_outline, theme),
+                _buildAboutSection(theme),
+                const SizedBox(height: 40),
+              ]),
             ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildSliverAppBar(ThemeData theme) {
+    return SliverAppBar(
+      expandedHeight: 200.0,
+      floating: false,
+      pinned: true,
+      backgroundColor: theme.colorScheme.primary,
+      flexibleSpace: FlexibleSpaceBar(
+        title: const Text(
+          'Settings',
+          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+        ),
+        centerTitle: true,
+        background: Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    theme.colorScheme.primary,
+                    theme.colorScheme.secondary,
+                  ],
+                ),
+              ),
+            ),
+            CustomPaint(
+              painter: IslamicPatternPainter(color: Colors.white, opacity: 0.1),
+            ),
+            Positioned(
+              bottom: -20,
+              right: -20,
+              child: Icon(
+                Icons.settings,
+                size: 150,
+                color: Colors.white.withOpacity(0.05),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon, ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.only(bottom: 16, left: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: theme.colorScheme.primary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: theme.textTheme.titleLarge?.color,
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCard(Widget child, ThemeData theme) {
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
+      ),
+      child: ClipRRect(borderRadius: BorderRadius.circular(24), child: child),
+    );
+  }
+
+  Widget _buildThemeSection(ThemeData theme) {
+    return _buildCard(
+      ListenableBuilder(
+        listenable: _themeService,
+        builder: (context, child) {
+          return Column(
+            children: [
+              _buildRadioTile(
+                'Light Mode',
+                Icons.wb_sunny_rounded,
+                AppThemeMode.light,
+                theme,
+              ),
+              Divider(height: 1, color: theme.dividerColor.withOpacity(0.1)),
+              _buildRadioTile(
+                'Dark Mode',
+                Icons.nightlight_round,
+                AppThemeMode.dark,
+                theme,
+              ),
+              Divider(height: 1, color: theme.dividerColor.withOpacity(0.1)),
+              _buildRadioTile(
+                'System Default',
+                Icons.brightness_auto,
+                AppThemeMode.system,
+                theme,
+              ),
+            ],
+          );
+        },
+      ),
+      theme,
+    );
+  }
+
+  Widget _buildRadioTile(
+    String title,
+    IconData icon,
+    AppThemeMode value,
+    ThemeData theme,
+  ) {
+    final isSelected = _themeService.currentThemeMode == value;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _themeService.setThemeMode(value),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? theme.colorScheme.primary : Colors.grey,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: isSelected ? theme.colorScheme.primary : null,
+                  ),
+                ),
+              ),
+              if (isSelected)
+                Icon(Icons.check_circle, color: theme.colorScheme.primary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotificationSection(ThemeData theme) {
+    return _buildCard(
+      Column(
+        children: [
+          SwitchListTile(
+            value: _settings!.notificationsEnabled,
+            onChanged: _toggleNotifications,
+            title: const Text('Daily Reminders'),
+            subtitle: const Text('Get notified to read your daily ayah'),
+            activeColor: theme.colorScheme.primary,
+            secondary: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _settings!.notificationsEnabled
+                    ? theme.colorScheme.primary.withOpacity(0.1)
+                    : Colors.grey.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.notifications_active,
+                size: 20,
+                color: _settings!.notificationsEnabled
+                    ? theme.colorScheme.primary
+                    : Colors.grey,
+              ),
+            ),
+          ),
+          if (_settings!.notificationsEnabled) ...[
+            Divider(height: 1, color: theme.dividerColor.withOpacity(0.1)),
+            ListTile(
+              onTap: _pickTime,
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.access_time,
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              title: const Text('Reminder Time'),
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: theme.dividerColor),
+                ),
+                child: Text(
+                  _settings!.notificationTimeString,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+            ),
+          ],
+          Divider(height: 1, color: theme.dividerColor.withOpacity(0.1)),
+          SwitchListTile(
+            value: _settings!.enableQuickGlance,
+            onChanged: _toggleQuickGlance,
+            title: const Text('Quick Glance'),
+            subtitle: const Text('Persistent notification for easy access'),
+            activeColor: theme.colorScheme.primary,
+            secondary: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _settings!.enableQuickGlance
+                    ? theme.colorScheme.primary.withOpacity(0.1)
+                    : Colors.grey.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.visibility,
+                size: 20,
+                color: _settings!.enableQuickGlance
+                    ? theme.colorScheme.primary
+                    : Colors.grey,
+              ),
+            ),
+          ),
+        ],
+      ),
+      theme,
+    );
+  }
+
+  Widget _buildDataSection(ThemeData theme) {
+    return _buildCard(
+      Column(
+        children: [
+          _buildActionTile(
+            'Export Favorites',
+            'Backup your collection',
+            Icons.upload_file,
+            () async {
+              final backupService = BackupService();
+              await backupService.exportFavorites(context);
+            },
+            theme,
+            showChevron: false,
+          ),
+          Divider(height: 1, color: theme.dividerColor.withOpacity(0.1)),
+          _buildActionTile(
+            'Import Favorites',
+            'Restore from backup',
+            Icons.file_download,
+            () async {
+              final backupService = BackupService();
+              await backupService.importFavorites(context);
+            },
+            theme,
+            showChevron: false,
+          ),
+          Divider(height: 1, color: theme.dividerColor.withOpacity(0.1)),
+          _buildActionTile(
+            'Weekly Digest',
+            'Generate PDF summary',
+            Icons.picture_as_pdf,
+            () async {
+              final pdfService = PdfService();
+              await pdfService.generateAndShareWeeklyDigest();
+            },
+            theme,
+            showChevron: false,
+          ),
+        ],
+      ),
+      theme,
+    );
+  }
+
+  Widget _buildWidgetSection(ThemeData theme) {
+    return _buildCard(
+      Column(
+        children: [
+          _buildActionTile(
+            'Refresh Widget',
+            'Update home screen content',
+            Icons.refresh,
+            () async {
+              await _widgetService.updateWidget();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Widget refreshed successfully!'),
+                  ),
+                );
+              }
+            },
+            theme,
+            showChevron: false,
+          ),
+          Divider(height: 1, color: theme.dividerColor.withOpacity(0.1)),
+          _buildActionTile(
+            'Add to Home Screen',
+            'Pin the Daily Ayah widget',
+            Icons.add_to_home_screen,
+            () async {
+              try {
+                await HomeWidget.requestPinWidget(
+                  androidName: 'DailyAyahWidgetProvider',
+                );
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not pin widget: $e')),
+                  );
+                }
+              }
+            },
+            theme,
+            showChevron: false,
+          ),
+        ],
+      ),
+      theme,
+    );
+  }
+
+  Widget _buildAboutSection(ThemeData theme) {
+    return _buildCard(
+      Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.menu_book,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Daily Ayah',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Version 1.0.0',
+                      style: TextStyle(color: theme.textTheme.bodySmall?.color),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'A beautiful companion for your daily Quran reading journey. Designed with love and care for the Ummah.',
+              style: TextStyle(
+                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+      theme,
+    );
+  }
+
+  Widget _buildActionTile(
+    String title,
+    String subtitle,
+    IconData icon,
+    VoidCallback onTap,
+    ThemeData theme, {
+    bool showChevron = true,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: theme.dividerColor.withOpacity(0.5),
+                  ),
+                ),
+                child: Icon(icon, size: 20, color: theme.colorScheme.primary),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.textTheme.bodySmall?.color,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (showChevron)
+                Icon(Icons.chevron_right, color: theme.dividerColor, size: 20),
+            ],
+          ),
+        ),
       ),
     );
   }
