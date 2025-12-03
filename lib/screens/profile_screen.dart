@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
+import 'dart:ui';
 import '../services/streak_service.dart';
 import '../services/badge_service.dart';
 import '../models/user_stats.dart';
 import '../models/badge.dart' as model;
-import '../widgets/animated_counter.dart';
-import '../widgets/streak_flame.dart';
-import '../widgets/badge_card.dart';
+import '../widgets/islamic_pattern_painter.dart';
+import '../widgets/ornamental_divider.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -16,16 +15,34 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
   final StreakService _streakService = StreakService();
   final BadgeService _badgeService = BadgeService();
   late UserStats _stats;
   late List<model.Badge> _badges;
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    );
     _loadData();
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   void _loadData() {
@@ -37,28 +54,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: CustomScrollView(
-        slivers: [
-          _buildHeader(),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildStatsGrid(),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Achievements',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildBadgeGrid(),
-                  const SizedBox(height: 24),
-                  _buildJoinDate(),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: const Text(
+          'My Journey',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: Colors.white,
+      ),
+      body: Stack(
+        children: [
+          // Background Gradient
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  colorScheme.primary,
+                  colorScheme.secondary,
+                  theme.scaffoldBackgroundColor,
                 ],
+                stops: const [0.0, 0.4, 0.7],
+              ),
+            ),
+          ),
+
+          // Islamic Pattern
+          Positioned.fill(
+            child: CustomPaint(
+              painter: IslamicPatternPainter(
+                color: Colors.white,
+                opacity: 0.05,
+              ),
+            ),
+          ),
+
+          // Content
+          SafeArea(
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    _buildStreakHeader(colorScheme),
+                    const SizedBox(height: 30),
+                    _buildStatsGrid(theme),
+                    const SizedBox(height: 30),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: OrnamentalDivider(color: colorScheme.tertiary),
+                    ),
+                    const SizedBox(height: 30),
+                    _buildTrophyCase(theme),
+                    const SizedBox(height: 40),
+                    _buildJoinDate(),
+                    const SizedBox(height: 100), // Bottom padding
+                  ],
+                ),
               ),
             ),
           ),
@@ -67,141 +129,134 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildHeader() {
-    final theme = Theme.of(context);
-    return SliverAppBar(
-      expandedHeight: 200,
-      pinned: true,
-      backgroundColor: theme.primaryColor,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [theme.primaryColor, theme.colorScheme.secondary],
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(height: 40),
-              const StreakFlame(size: 60),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  AnimatedCounter(
-                    value: _stats.currentStreak,
-                    style: const TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Day Streak',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              Text(
-                'Keep it up!',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
-                  fontSize: 14,
+  Widget _buildStreakHeader(ColorScheme colorScheme) {
+    return Column(
+      children: [
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            // Outer Glow
+            Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    colorScheme.tertiary.withOpacity(0.3),
+                    Colors.transparent,
+                  ],
                 ),
               ),
-            ],
+            ),
+            // Circular Progress
+            SizedBox(
+              width: 160,
+              height: 160,
+              child: CircularProgressIndicator(
+                value: 1.0, // Full circle for now, could be streak goal
+                strokeWidth: 8,
+                color: colorScheme.tertiary.withOpacity(0.8),
+                backgroundColor: Colors.white.withOpacity(0.1),
+              ),
+            ),
+            // Inner Content
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.local_fire_department,
+                  size: 40,
+                  color: colorScheme.tertiary,
+                ),
+                Text(
+                  '${_stats.currentStreak}',
+                  style: const TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    height: 1.0,
+                  ),
+                ),
+                const Text(
+                  'Day Streak',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatsGrid() {
-    final unlockedCount = _badges.where((b) => b.isUnlocked).length;
-
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
-      childAspectRatio: 1.5,
-      children: [
-        _buildStatCard(
-          'Total Days',
-          _stats.totalDaysOpened.toString(),
-          Icons.calendar_today,
-          Colors.blue,
-        ),
-        _buildStatCard(
-          'Badges',
-          '$unlockedCount/${_badges.length}',
-          Icons.emoji_events,
-          Colors.amber,
-        ),
-        _buildStatCard(
-          'Favorites',
-          _stats.totalFavorites.toString(),
-          Icons.favorite,
-          Colors.red,
-        ),
-        _buildStatCard(
-          'Ayahs Read',
-          _stats.totalAyahsRead.toString(),
-          Icons.menu_book,
-          Colors.purple,
+          child: const Text(
+            'Keep the divine light burning!',
+            style: TextStyle(color: Colors.white, fontSize: 14),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildStatCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+  Widget _buildStatsGrid(ThemeData theme) {
+    final unlockedCount = _badges.where((b) => b.isUnlocked).length;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icon, color: color, size: 24),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+          const Padding(
+            padding: EdgeInsets.only(left: 8, bottom: 16),
+            child: Text(
+              'Overview',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
-              Text(
-                title,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            childAspectRatio: 1.3,
+            children: [
+              _buildGlassStatCard(
+                'Total Days',
+                _stats.totalDaysOpened.toString(),
+                Icons.calendar_today,
+                Colors.blue.shade300,
+              ),
+              _buildGlassStatCard(
+                'Badges',
+                '$unlockedCount/${_badges.length}',
+                Icons.emoji_events,
+                Colors.amber.shade300,
+              ),
+              _buildGlassStatCard(
+                'Favorites',
+                _stats.totalFavorites.toString(),
+                Icons.favorite,
+                Colors.red.shade300,
+              ),
+              _buildGlassStatCard(
+                'Ayahs Read',
+                _stats.totalAyahsRead.toString(),
+                Icons.menu_book,
+                Colors.purple.shade300,
               ),
             ],
           ),
@@ -210,7 +265,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildBadgeGrid() {
+  Widget _buildGlassStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color iconColor,
+  ) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white.withOpacity(0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrophyCase(ThemeData theme) {
     final categories = {
       'streak': 'Streak Master 🔥',
       'collection': 'Collection Builder 📚',
@@ -220,6 +331,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     };
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: categories.entries.map((entry) {
         final categoryBadges =
             _badges.where((b) => b.category == entry.key).toList()
@@ -231,33 +343,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               child: Text(
                 entry.value,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade800,
+                  color: theme.textTheme.bodyLarge?.color,
                 ),
               ),
             ),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.85,
+            SizedBox(
+              height: 140,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                physics: const BouncingScrollPhysics(),
+                itemCount: categoryBadges.length,
+                itemBuilder: (context, index) {
+                  return _buildBadgeCard(categoryBadges[index]);
+                },
               ),
-              itemCount: categoryBadges.length,
-              itemBuilder: (context, index) {
-                final badge = categoryBadges[index];
-                return BadgeCard(
-                  badge: badge,
-                  onTap: () => _showBadgeDetails(badge),
-                );
-              },
             ),
             const SizedBox(height: 16),
           ],
@@ -266,11 +372,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildBadgeCard(model.Badge badge) {
+    return GestureDetector(
+      onTap: () => _showBadgeDetails(badge),
+      child: Container(
+        width: 100,
+        margin: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: badge.isUnlocked
+                    ? Colors.orange.shade50
+                    : Colors.grey.shade100,
+                boxShadow: badge.isUnlocked
+                    ? [
+                        BoxShadow(
+                          color: Colors.orange.withOpacity(0.2),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ]
+                    : null,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                badge.isUnlocked ? badge.icon : '🔒',
+                style: const TextStyle(fontSize: 32),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              badge.name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: badge.isUnlocked ? Colors.black87 : Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildJoinDate() {
     return Center(
-      child: Text(
-        'Member since ${DateFormat.yMMMd().format(_stats.joinDate)}',
-        style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          'Member since ${DateFormat.yMMMd().format(_stats.joinDate)}',
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+        ),
       ),
     );
   }
@@ -280,63 +455,88 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 80,
-              height: 80,
+              width: 100,
+              height: 100,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: badge.isUnlocked
                     ? Colors.orange.shade50
                     : Colors.grey.shade100,
+                boxShadow: badge.isUnlocked
+                    ? [
+                        BoxShadow(
+                          color: Colors.orange.withOpacity(0.3),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ]
+                    : null,
               ),
               alignment: Alignment.center,
               child: Text(
                 badge.isUnlocked ? badge.icon : '🔒',
-                style: const TextStyle(fontSize: 40),
+                style: const TextStyle(fontSize: 50),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
               badge.name,
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Text(
               badge.description,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade600,
+                height: 1.5,
+              ),
             ),
             if (badge.isUnlocked && badge.unlockedDate != null) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
+                  horizontal: 16,
+                  vertical: 8,
                 ),
                 decoration: BoxDecoration(
                   color: Colors.green.shade50,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: Colors.green.shade200),
                 ),
-                child: Text(
-                  'Unlocked on ${DateFormat.yMMMd().format(badge.unlockedDate!)}',
-                  style: TextStyle(
-                    color: Colors.green.shade700,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      size: 16,
+                      color: Colors.green.shade700,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Unlocked on ${DateFormat.yMMMd().format(badge.unlockedDate!)}',
+                      style: TextStyle(
+                        color: Colors.green.shade700,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
           ],
         ),
       ),

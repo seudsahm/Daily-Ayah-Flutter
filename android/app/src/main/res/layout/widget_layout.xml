@@ -4,59 +4,50 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="16dp"
-    android:background="@drawable/widget_background">
+    android:background="@drawable/widget_background"
+    android:gravity="center">
 
-    <!-- Surah Reference -->
+    <!-- Flame Icon -->
+    <ImageView
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:src="@android:drawable/ic_lock_idle_low_battery" 
+        android:tint="#FFD700"
+        android:layout_marginBottom="4dp" />
+
+    <!-- Streak Count -->
     <TextView
-        android:id="@+id/widget_reference"
-        android:layout_width="match_parent"
+        android:id="@+id/widget_streak_count"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/widget_reference"
-        android:textSize="12sp"
+        android:text="0"
+        android:textSize="42sp"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:includeFontPadding="false"
+        android:gravity="center" />
+
+    <!-- Label -->
+    <TextView
+        android:id="@+id/widget_streak_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Day Streak"
+        android:textSize="14sp"
         android:textColor="#FFFFFF"
         android:alpha="0.9"
         android:textStyle="bold"
-        android:gravity="center"
-        android:paddingBottom="8dp" />
+        android:gravity="center" />
 
-    <!-- Arabic Text -->
+    <!-- Motivational Text -->
     <TextView
-        android:id="@+id/widget_arabic"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/widget_arabic_text"
-        android:textSize="20sp"
-        android:textColor="#FFFFFF"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:lineSpacingMultiplier="1.8"
-        android:paddingVertical="12dp"
-        android:textDirection="rtl" />
-
-    <!-- Translation -->
-    <TextView
-        android:id="@+id/widget_translation"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/widget_translation"
-        android:textSize="13sp"
-        android:textColor="#FFFFFF"
-        android:alpha="0.95"
-        android:gravity="center"
-        android:lineSpacingMultiplier="1.4"
-        android:paddingTop="8dp"
-        android:maxLines="4"
-        android:ellipsize="end" />
-
-    <!-- App Name Footer -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Daily Ayah"
-        android:textSize="10sp"
+        android:text="Keep it up!"
+        android:textSize="12sp"
         android:textColor="#FFFFFF"
         android:alpha="0.7"
-        android:gravity="center"
-        android:paddingTop="12dp"
-        android:layout_marginTop="8dp" />
+        android:layout_marginTop="4dp"
+        android:gravity="center" />
+
 </LinearLayout>

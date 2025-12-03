@@ -7,9 +7,10 @@ import '../services/favorites_service.dart';
 import '../services/share_service.dart';
 import 'search_screen.dart';
 import '../services/collections_service.dart';
-
 import '../services/streak_service.dart';
 import '../services/badge_service.dart';
+import '../widgets/islamic_pattern_painter.dart';
+import '../widgets/ornamental_divider.dart';
 
 class HomeScreen extends StatefulWidget {
   final int? initialSurahId;
@@ -27,7 +28,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isLoading = true;
   String _errorMessage = '';
   bool _isFavorite = false;
-  int _totalAyahs = 6236; // Default approximation
+  int _totalAyahs = 6236;
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
@@ -46,7 +47,6 @@ class _HomeScreenState extends State<HomeScreen>
       parent: _fadeController,
       curve: Curves.easeIn,
     );
-
     _initializeServices();
   }
 
@@ -64,9 +64,7 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _initializeServices() async {
     try {
       await _favoritesService.initialize();
-      // AyahSelectorService handles data loading internally
       await _ayahSelectorService.initialize();
-
       if (widget.initialSurahId != null && widget.initialAyahId != null) {
         await _loadSpecificAyah(widget.initialSurahId!, widget.initialAyahId!);
       } else {
@@ -88,13 +86,10 @@ class _HomeScreenState extends State<HomeScreen>
       _isLoading = true;
       _errorMessage = '';
     });
-
     try {
-      // Get read ayahs to ensure uniqueness
       final streakService = StreakService();
       await streakService.initialize();
       final readIds = streakService.stats.readAyahIds;
-
       final ayah = await _ayahSelectorService.getUniqueAyahOfTheDay(readIds);
       _updateCurrentAyah(ayah);
     } catch (e) {
@@ -113,10 +108,8 @@ class _HomeScreenState extends State<HomeScreen>
       _isLoading = true;
       _errorMessage = '';
     });
-
     try {
       final ayah = await _ayahSelectorService.getSpecificAyah(surahId, ayahId);
-
       if (ayah != null) {
         _updateCurrentAyah(ayah);
       } else {
@@ -139,13 +132,10 @@ class _HomeScreenState extends State<HomeScreen>
       _isLoading = true;
       _errorMessage = '';
     });
-
     try {
-      // Get read ayahs to ensure uniqueness
       final streakService = StreakService();
       await streakService.initialize();
       final readIds = streakService.stats.readAyahIds;
-
       final ayah = await _ayahSelectorService.getUniqueRandomAyah(readIds);
       _updateCurrentAyah(ayah);
     } catch (e) {
@@ -169,19 +159,13 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _updateCurrentAyah(AyahWithSurah ayah) {
     if (!mounted) return;
-
-    // Cancel existing timer if user swipes/changes ayah before 7 seconds
     _readTimer?.cancel();
-
     _checkFavoriteStatus(ayah);
-
-    // Start new 7-second timer for read count
     _readTimer = Timer(const Duration(seconds: 7), () {
       if (mounted && _currentAyah == ayah) {
         _incrementReadStats();
       }
     });
-
     setState(() {
       _currentAyah = ayah;
       _isLoading = false;
@@ -197,11 +181,9 @@ class _HomeScreenState extends State<HomeScreen>
       _currentAyah!.surah.id,
       _currentAyah!.ayah.id,
     );
-
     final badgeService = BadgeService();
     await badgeService.initialize();
     final newBadges = await badgeService.checkNewUnlocks();
-
     if (newBadges.isNotEmpty && mounted) {
       for (var badge in newBadges) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -235,7 +217,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _checkFavoriteStatus(AyahWithSurah ayah) {
-    // Ayah.id is the number in surah
     final isFav = _favoritesService.isFavorite(ayah.surah.id, ayah.ayah.id);
     setState(() {
       _isFavorite = isFav;
@@ -244,14 +225,11 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _toggleFavorite() async {
     if (_currentAyah == null) return;
-
     await _favoritesService.toggleFavorite(_currentAyah!);
-
     if (mounted) {
       setState(() {
         _isFavorite = !_isFavorite;
       });
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -272,14 +250,10 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _showAddToCollectionDialog() async {
     if (_currentAyah == null) return;
-
     await _collectionsService.initialize();
     final collections = _collectionsService.getAllCollections();
-
     if (!mounted) return;
-
     if (collections.isEmpty) {
-      // Show message to create collection first
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -297,8 +271,6 @@ class _HomeScreenState extends State<HomeScreen>
       );
       return;
     }
-
-    // Show collection selection dialog
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -315,7 +287,6 @@ class _HomeScreenState extends State<HomeScreen>
                 _currentAyah!.surah.id,
                 _currentAyah!.ayah.id,
               );
-
               return CheckboxListTile(
                 title: Text(collection.name),
                 subtitle: Text('${collection.ayahKeys.length} ayahs'),
@@ -364,14 +335,18 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text(
           'Daily Ayah',
-          style: TextStyle(fontWeight: FontWeight.w600),
+          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0),
         ),
-        backgroundColor: const Color(0xFF1B5E20),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
@@ -406,236 +381,330 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage.isNotEmpty
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: Colors.red,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      _errorMessage,
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton.icon(
-                      onPressed: _loadTodaysAyah,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                    ),
-                  ],
+      body: Stack(
+        children: [
+          // Background Gradient
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  colorScheme.primary,
+                  colorScheme.secondary,
+                  theme.scaffoldBackgroundColor,
+                ],
+                stops: const [0.0, 0.3, 0.6],
+              ),
+            ),
+          ),
+
+          // Islamic Geometric Pattern Background
+          Positioned.fill(
+            child: CustomPaint(
+              painter: IslamicPatternPainter(
+                color: Colors.white,
+                opacity: 0.08,
+              ),
+            ),
+          ),
+
+          // Decorative Glow Elements
+          Positioned(
+            top: -80,
+            right: -80,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Colors.white.withOpacity(0.1), Colors.transparent],
                 ),
               ),
-            )
-          : _currentAyah == null
-          ? const Center(child: Text('No ayah found'))
-          : FadeTransition(
-              opacity: _fadeAnimation,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Date header card
-                    Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 16,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.calendar_today,
-                              size: 18,
-                              color: Color(0xFF1B5E20),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              DateTime.now().toString().split(' ')[0],
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF1B5E20),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Arabic text card
-                    Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.green.shade50,
-                              Colors.green.shade100,
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.green.shade200,
-                            width: 1,
-                          ),
-                        ),
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          _currentAyah!.arabicText,
-                          style: const TextStyle(
-                            fontFamily: 'Amiri',
-                            fontSize: 32,
-                            height: 2.2,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF1B5E20),
-                          ),
-                          textAlign: TextAlign.center,
-                          textDirection: TextDirection.rtl,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Translation card
-                    Card(
-                      elevation: 3,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(
-                                  Icons.translate,
-                                  size: 18,
-                                  color: Colors.grey,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Translation',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              _currentAyah!.translation,
-                              style: const TextStyle(
-                                fontSize: 17,
-                                height: 1.8,
-                                color: Colors.black87,
-                              ),
-                              textAlign: TextAlign.justify,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Reference
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1B5E20).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          _currentAyah!.reference,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1B5E20),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Action buttons
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        // Favorite button
-                        _ActionButton(
-                          icon: _isFavorite
-                              ? Icons.favorite
-                              : Icons.favorite_border,
-                          label: 'Favorite',
-                          color: Colors.red,
-                          onPressed: _toggleFavorite,
-                        ),
-
-                        // Share button
-                        _ActionButton(
-                          icon: Icons.share,
-                          label: 'Share',
-                          color: Colors.blue,
-                          onPressed: _shareAyah,
-                        ),
-
-                        // Add to Collection button
-                        _ActionButton(
-                          icon: Icons.folder,
-                          label: 'Collection',
-                          color: const Color(0xFF1B5E20),
-                          onPressed: _showAddToCollectionDialog,
-                        ),
-
-                        // New Ayah button
-                        _ActionButton(
-                          icon: Icons.shuffle,
-                          label: 'New Ayah',
-                          color: Colors.green,
-                          onPressed: _loadRandomAyah,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 32),
+            ),
+          ),
+          Positioned(
+            bottom: -100,
+            left: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    colorScheme.tertiary.withOpacity(0.08),
+                    Colors.transparent,
                   ],
                 ),
               ),
             ),
+          ),
+
+          SafeArea(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  )
+                : _errorMessage.isNotEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            size: 64,
+                            color: Colors.white70,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _errorMessage,
+                            style: const TextStyle(color: Colors.white),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
+                          ElevatedButton.icon(
+                            onPressed: _loadTodaysAyah,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : _currentAyah == null
+                ? const Center(
+                    child: Text(
+                      'No ayah found',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  )
+                : FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20.0,
+                        vertical: 10.0,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Date Display
+                          Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(30),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.2),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.calendar_today,
+                                    size: 14,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    DateTime.now().toString().split(' ')[0],
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 30),
+
+                          // Main Ayah Card
+                          Container(
+                            decoration: BoxDecoration(
+                              color: theme.cardTheme.color,
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: colorScheme.primary.withOpacity(0.15),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                // Header with Surah Info
+                                Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primary.withOpacity(
+                                      0.03,
+                                    ),
+                                    borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(30),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'SURAH',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              letterSpacing: 1.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: colorScheme.secondary,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _currentAyah!.surah.transliteration,
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: colorScheme.primary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: colorScheme.tertiary,
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          _currentAyah!.reference,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                // Arabic Text
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    24,
+                                    32,
+                                    24,
+                                    24,
+                                  ),
+                                  child: Text(
+                                    _currentAyah!.arabicText,
+                                    style: TextStyle(
+                                      fontFamily: 'Amiri',
+                                      fontSize: 36,
+                                      height: 2.0,
+                                      fontWeight: FontWeight.w600,
+                                      color: colorScheme.primary,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    textDirection: TextDirection.rtl,
+                                  ),
+                                ),
+
+                                // Ornamental Divider
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                  child: OrnamentalDivider(
+                                    color: colorScheme.tertiary,
+                                    height: 40,
+                                  ),
+                                ),
+
+                                // Translation
+                                Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Text(
+                                    _currentAyah!.translation,
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      fontSize: 18,
+                                      height: 1.6,
+                                      color: theme.textTheme.bodyLarge?.color
+                                          ?.withOpacity(0.8),
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 30),
+
+                          // Action Buttons
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _ActionButton(
+                                icon: _isFavorite
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                label: 'Favorite',
+                                isActive: _isFavorite,
+                                activeColor: Colors.red,
+                                onPressed: _toggleFavorite,
+                              ),
+                              _ActionButton(
+                                icon: Icons.share_outlined,
+                                label: 'Share',
+                                onPressed: _shareAyah,
+                              ),
+                              _ActionButton(
+                                icon: Icons.bookmark_border,
+                                label: 'Collection',
+                                onPressed: _showAddToCollectionDialog,
+                              ),
+                              _ActionButton(
+                                icon: Icons.shuffle,
+                                label: 'New Ayah',
+                                isPrimary: true,
+                                onPressed: _loadRandomAyah,
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 32),
+                        ],
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -643,47 +712,117 @@ class _HomeScreenState extends State<HomeScreen>
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Color color;
   final VoidCallback onPressed;
+  final bool isActive;
+  final bool isPrimary;
+  final Color? activeColor;
 
   const _ActionButton({
     required this.icon,
     required this.label,
-    required this.color,
     required this.onPressed,
+    this.isActive = false,
+    this.isPrimary = false,
+    this.activeColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.3)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: color, size: 28),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color.withOpacity(0.9),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    if (isPrimary) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [colorScheme.primary, colorScheme.secondary],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.primary.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
                 ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onPressed,
+                borderRadius: BorderRadius.circular(30),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Icon(icon, color: Colors.white, size: 28),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: colorScheme.primary,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: isActive
+                ? (activeColor ?? colorScheme.primary).withOpacity(0.1)
+                : Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onPressed,
+              borderRadius: BorderRadius.circular(30),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Icon(
+                  icon,
+                  color: isActive
+                      ? (activeColor ?? colorScheme.primary)
+                      : Colors.grey.shade600,
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
         ),
-      ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            color: isActive
+                ? (activeColor ?? colorScheme.primary)
+                : Colors.grey.shade600,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 }

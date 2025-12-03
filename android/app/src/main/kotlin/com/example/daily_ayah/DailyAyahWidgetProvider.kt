@@ -22,14 +22,12 @@ class DailyAyahWidgetProvider : AppWidgetProvider() {
             ).apply {
                 // Get data from HomeWidget plugin
                 val widgetData = HomeWidgetPlugin.getData(context)
-                val arabicText = widgetData.getString("arabic_text", context.getString(R.string.widget_arabic_text))
-                val translation = widgetData.getString("translation", context.getString(R.string.widget_translation))
-                val reference = widgetData.getString("reference", context.getString(R.string.widget_reference))
+                val streakCount = widgetData.getString("streak_count", "0")
+                val streakLabel = widgetData.getString("streak_label", "Day Streak")
 
                 // Update widget views
-                setTextViewText(R.id.widget_arabic, arabicText)
-                setTextViewText(R.id.widget_translation, translation)
-                setTextViewText(R.id.widget_reference, reference)
+                setTextViewText(R.id.widget_streak_count, streakCount)
+                setTextViewText(R.id.widget_streak_label, streakLabel)
 
                 // Set click intent to open app
                 val intent = Intent(context, MainActivity::class.java)
@@ -42,8 +40,7 @@ class DailyAyahWidgetProvider : AppWidgetProvider() {
                 }
                 
                 val pendingIntent = PendingIntent.getActivity(context, 0, intent, flags)
-                setOnClickPendingIntent(R.id.widget_arabic, pendingIntent)
-                setOnClickPendingIntent(R.id.widget_translation, pendingIntent)
+                setOnClickPendingIntent(R.id.widget_streak_count, pendingIntent)
             }
 
             appWidgetManager.updateAppWidget(widgetId, views)
