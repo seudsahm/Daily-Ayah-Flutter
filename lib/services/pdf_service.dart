@@ -1,0 +1,167 @@
+import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:intl/intl.dart';
+import '../services/streak_service.dart';
+import '../services/favorites_service.dart';
+import '../services/ayah_selector_service.dart';
+import '../services/badge_service.dart';
+import '../models/ayah_with_surah.dart';
+
+class PdfService {
+  final StreakService _streakService = StreakService();
+  final FavoritesService _favoritesService = FavoritesService();
+  final AyahSelectorService _ayahSelectorService = AyahSelectorService();
+
+  Future<void> generateAndShareWeeklyDigest() async {
+    final pdf = pw.Document();
+
+    // Load data
+    await _streakService.initialize();
+    await _favoritesService.initialize();
+
+    final recentAyahIds = _streakService.stats.recentAyahIds;
+    final recentAyahs = <AyahWithSurah>[];
+
+    for (var id in recentAyahIds) {
+      final parts = id.split('_');
+      if (parts.length == 2) {
+        final surahId = int.tryParse(parts[0]);
+        final ayahId = int.tryParse(parts[1]);
+        if (surahId != null && ayahId != null) {
+          try {
+            recentAyahs.add(_ayahSelectorService.getAyah(surahId, ayahId));
+          } catch (_) {}
+        }
+      }
+    }
+
+    final favorites = _favoritesService
+        .getAllFavorites()
+        .take(5)
+        .map((f) {
+          try {
+            return _ayahSelectorService.getAyah(f.surahId, f.ayahId);
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<AyahWithSurah>()
+        .toList();
+
+    // Load fonts
+    final font = await PdfGoogleFonts.amiriRegular();
+    final fontBold = await PdfGoogleFonts.amiriBold();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        theme: pw.ThemeData.withFont(base: font, bold: fontBold),
+        build: (pw.Context context) {
+          return [
+            _buildHeader(),
+            pw.SizedBox(height: 20),
+            if (recentAyahs.isNotEmpty) ...[
+              pw.Header(level: 1, text: 'Recently Read'),
+              ...recentAyahs.map((ayah) => _buildAyahItem(ayah)),
+              pw.SizedBox(height: 20),
+            ],
+            if (favorites.isNotEmpty) ...[
+              pw.Header(level: 1, text: 'Recent Favorites'),
+              ...favorites.map((ayah) => _buildAyahItem(ayah)),
+            ],
+            pw.SizedBox(height: 20),
+            _buildFooter(),
+          ];
+        },
+      ),
+    );
+
+    await Printing.sharePdf(
+      bytes: await pdf.save(),
+      filename:
+          'daily_ayah_digest_${DateFormat('yyyy_MM_dd').format(DateTime.now())}.pdf',
+    );
+
+    // Increment PDF stats
+    await _streakService.incrementPDFsGenerated();
+
+    // Check for badges
+    final badgeService = BadgeService();
+    await badgeService.initialize();
+    await badgeService.checkNewUnlocks();
+  }
+
+  pw.Widget _buildHeader() {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'Daily Ayah Weekly Digest',
+          style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.Text(
+          DateFormat.yMMMMd().format(DateTime.now()),
+          style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey700),
+        ),
+        pw.Divider(),
+      ],
+    );
+  }
+
+  pw.Widget _buildAyahItem(AyahWithSurah ayah) {
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 15),
+      padding: const pw.EdgeInsets.all(10),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey300),
+        borderRadius: pw.BorderRadius.circular(5),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                '${ayah.surah.transliteration} (${ayah.surah.id}:${ayah.ayah.id})',
+                style: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 8),
+          pw.Text(
+            ayah.ayah.text,
+            textAlign: pw.TextAlign.right,
+            textDirection: pw.TextDirection.rtl,
+            style: pw.TextStyle(fontSize: 16),
+          ),
+          pw.SizedBox(height: 5),
+          pw.Text(
+            ayah.ayah.translation,
+            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _buildFooter() {
+    return pw.Column(
+      children: [
+        pw.Divider(),
+        pw.Center(
+          child: pw.Text(
+            'Generated by Daily Ayah App',
+            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey500),
+          ),
+        ),
+      ],
+    );
+  }
+}

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Daily Ayah</string>
+    <string name="widget_description">Display today\'s ayah on your home screen</string>
+    <string name="widget_arabic_text">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</string>
+    <string name="widget_translation">In the name of Allah, the Most Gracious, the Most Merciful</string>
+    <string name="widget_reference">Al-Fatihah 1:1</string>
+</resources>
