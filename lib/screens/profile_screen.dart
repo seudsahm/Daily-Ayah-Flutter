@@ -279,9 +279,15 @@ class _ProfileScreenState extends State<ProfileScreen>
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
+            color: Theme.of(context).brightness == Brightness.light
+                ? Colors.black.withOpacity(0.05)
+                : Colors.white.withOpacity(0.1),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withOpacity(0.2)),
+            border: Border.all(
+              color: Theme.of(context).brightness == Brightness.light
+                  ? Colors.black.withOpacity(0.1)
+                  : Colors.white.withOpacity(0.2),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -300,17 +306,21 @@ class _ProfileScreenState extends State<ProfileScreen>
                 children: [
                   Text(
                     value,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? Colors.black87
+                          : Colors.white,
                     ),
                   ),
                   Text(
                     title,
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? Colors.black54
+                          : Colors.white.withOpacity(0.7),
                     ),
                   ),
                 ],

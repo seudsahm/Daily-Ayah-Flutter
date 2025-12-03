@@ -21,13 +21,16 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       notificationHour: fields[1] as int,
       notificationMinute: fields[2] as int,
       enableQuickGlance: fields[3] as bool,
+      lastDailyAyahSurahId: fields[4] as int?,
+      lastDailyAyahAyahId: fields[5] as int?,
+      lastDailyAyahDate: fields[6] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, AppSettings obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.notificationsEnabled)
       ..writeByte(1)
@@ -35,7 +38,13 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       ..writeByte(2)
       ..write(obj.notificationMinute)
       ..writeByte(3)
-      ..write(obj.enableQuickGlance);
+      ..write(obj.enableQuickGlance)
+      ..writeByte(4)
+      ..write(obj.lastDailyAyahSurahId)
+      ..writeByte(5)
+      ..write(obj.lastDailyAyahAyahId)
+      ..writeByte(6)
+      ..write(obj.lastDailyAyahDate);
   }
 
   @override

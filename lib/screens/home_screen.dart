@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'package:hive_flutter/hive_flutter.dart';
+import '../models/app_settings.dart';
 import '../services/ayah_selector_service.dart';
 import '../models/ayah_with_surah.dart';
 import '../services/favorites_service.dart';
@@ -87,10 +89,41 @@ class _HomeScreenState extends State<HomeScreen>
       _errorMessage = '';
     });
     try {
+      // Open settings box to check for persisted ayah
+      final settingsBox = await Hive.openBox<AppSettings>('settings');
+      final settings = settingsBox.get('app_settings') ?? AppSettings();
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+
+      // Check if we already have a saved ayah for today
+      if (settings.lastDailyAyahDate != null &&
+          settings.lastDailyAyahDate!.isAtSameMomentAs(today) &&
+          settings.lastDailyAyahSurahId != null &&
+          settings.lastDailyAyahAyahId != null) {
+        // Load the persisted ayah
+        final ayah = await _ayahSelectorService.getSpecificAyah(
+          settings.lastDailyAyahSurahId!,
+          settings.lastDailyAyahAyahId!,
+        );
+
+        if (ayah != null) {
+          _updateCurrentAyah(ayah);
+          return;
+        }
+      }
+
+      // If no persisted ayah or not for today, get a new unique one
       final streakService = StreakService();
       await streakService.initialize();
       final readIds = streakService.stats.readAyahIds;
       final ayah = await _ayahSelectorService.getUniqueAyahOfTheDay(readIds);
+
+      // Save this ayah as today's ayah
+      settings.lastDailyAyahDate = today;
+      settings.lastDailyAyahSurahId = ayah.surah.id;
+      settings.lastDailyAyahAyahId = ayah.ayah.id;
+      await settings.save();
+
       _updateCurrentAyah(ayah);
     } catch (e) {
       if (mounted) {
@@ -137,6 +170,18 @@ class _HomeScreenState extends State<HomeScreen>
       await streakService.initialize();
       final readIds = streakService.stats.readAyahIds;
       final ayah = await _ayahSelectorService.getUniqueRandomAyah(readIds);
+
+      // Update the persisted ayah to this new random one so it stays if app is reloaded
+      final settingsBox = await Hive.openBox<AppSettings>('settings');
+      final settings = settingsBox.get('app_settings');
+      if (settings != null) {
+        final now = DateTime.now();
+        settings.lastDailyAyahDate = DateTime(now.year, now.month, now.day);
+        settings.lastDailyAyahSurahId = ayah.surah.id;
+        settings.lastDailyAyahAyahId = ayah.ayah.id;
+        await settings.save();
+      }
+
       _updateCurrentAyah(ayah);
     } catch (e) {
       if (mounted) {
