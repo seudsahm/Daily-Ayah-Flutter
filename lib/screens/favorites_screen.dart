@@ -70,14 +70,18 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text(
           'Favorites',
-          style: TextStyle(fontWeight: FontWeight.w600),
+          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0),
         ),
-        backgroundColor: const Color(0xFF1B5E20),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
@@ -98,13 +102,17 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                        ),
                       ),
                       child: Text(
                         '$count',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
+                          color: Colors.white,
                         ),
                       ),
                     ),
@@ -114,56 +122,94 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ValueListenableBuilder<Box<FavoriteAyah>>(
-              valueListenable: _favoritesService.listenable,
-              builder: (context, box, _) {
-                final favorites = _favoritesService.getAllFavorites();
-
-                if (favorites.isEmpty) {
-                  return _buildEmptyState();
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: favorites.length,
-                  itemBuilder: (context, index) {
-                    final favorite = favorites[index];
-                    return _FavoriteCard(
-                      favorite: favorite,
-                      onRemove: () => _removeFavorite(favorite),
-                      onShare: () => _shareFavorite(favorite),
-                    );
-                  },
-                );
-              },
+      body: Stack(
+        children: [
+          // Background Gradient
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  colorScheme.primary,
+                  colorScheme.secondary,
+                  theme.scaffoldBackgroundColor,
+                ],
+                stops: const [0.0, 0.2, 0.5],
+              ),
             ),
+          ),
+
+          SafeArea(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  )
+                : ValueListenableBuilder<Box<FavoriteAyah>>(
+                    valueListenable: _favoritesService.listenable,
+                    builder: (context, box, _) {
+                      final favorites = _favoritesService.getAllFavorites();
+
+                      if (favorites.isEmpty) {
+                        return _buildEmptyState(theme);
+                      }
+
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: favorites.length,
+                        itemBuilder: (context, index) {
+                          final favorite = favorites[index];
+                          return _FavoriteCard(
+                            favorite: favorite,
+                            onRemove: () => _removeFavorite(favorite),
+                            onShare: () => _shareFavorite(favorite),
+                          );
+                        },
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(ThemeData theme) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.favorite_border, size: 80, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'No Favorites Yet',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade700,
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.favorite_border,
+                size: 64,
+                color: Colors.white70,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 24),
+            const Text(
+              'No Favorites Yet',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 12),
             Text(
               'Save your favorite ayahs to read them later',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.white.withOpacity(0.8),
+              ),
             ),
           ],
         ),
@@ -185,80 +231,53 @@ class _FavoriteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Card(
-      elevation: 2,
+      elevation: 4,
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Arabic text
-            Text(
-              favorite.arabicText,
-              style: const TextStyle(
-                fontFamily: 'Amiri',
-                fontSize: 24,
-                height: 2.0,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF1B5E20),
-              ),
-              textAlign: TextAlign.right,
-              textDirection: TextDirection.rtl,
-            ),
-
-            const SizedBox(height: 12),
-            const Divider(),
-            const SizedBox(height: 12),
-
-            // Translation
-            Text(
-              favorite.translation,
-              style: const TextStyle(
-                fontSize: 15,
-                height: 1.6,
-                color: Colors.black87,
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Reference and actions
+            // Header with Reference and Actions
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Reference
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1B5E20).withOpacity(0.1),
+                    color: colorScheme.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     favorite.reference,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1B5E20),
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.primary,
                     ),
                   ),
                 ),
-
-                // Actions
                 Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.share, size: 20),
-                      color: Colors.blue,
+                      icon: const Icon(Icons.share_outlined, size: 20),
+                      color: colorScheme.secondary,
                       onPressed: onShare,
                       tooltip: 'Share',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                     ),
+                    const SizedBox(width: 16),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, size: 20),
+                      icon: const Icon(Icons.favorite, size: 20),
                       color: Colors.red,
                       onPressed: () {
                         showDialog(
@@ -288,10 +307,42 @@ class _FavoriteCard extends StatelessWidget {
                         );
                       },
                       tooltip: 'Remove',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                     ),
                   ],
                 ),
               ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Arabic text
+            Text(
+              favorite.arabicText,
+              style: TextStyle(
+                fontFamily: 'Amiri',
+                fontSize: 26,
+                height: 2.0,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.primary,
+              ),
+              textAlign: TextAlign.right,
+              textDirection: TextDirection.rtl,
+            ),
+
+            const SizedBox(height: 16),
+            Divider(color: Colors.grey.withOpacity(0.2)),
+            const SizedBox(height: 16),
+
+            // Translation
+            Text(
+              favorite.translation,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontSize: 16,
+                height: 1.6,
+                color: theme.textTheme.bodyLarge?.color?.withOpacity(0.8),
+              ),
             ),
           ],
         ),
