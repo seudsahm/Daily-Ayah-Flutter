@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/deep_link_service.dart';
+import '../services/badge_service.dart';
+import '../widgets/badge_reveal_sheet.dart';
+import '../models/badge.dart' as model;
 import 'favorites_screen.dart';
 import 'home_screen.dart';
 import 'settings_screen.dart';
@@ -27,6 +30,28 @@ class _MainNavigationState extends State<MainNavigation> {
   void initState() {
     super.initState();
     _initDeepLinks();
+    _initBadgeListener();
+  }
+
+  void _initBadgeListener() {
+    BadgeService().onUnlocks.listen((badges) {
+      if (!mounted) return;
+      _showBadgeQueue(badges);
+    });
+  }
+
+  Future<void> _showBadgeQueue(List<model.Badge> badges) async {
+    for (var badge in badges) {
+      if (!mounted) return;
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => BadgeRevealSheet(badge: badge),
+      );
+      // Small delay between badges if multiple unlocked
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
   }
 
   void _initDeepLinks() async {

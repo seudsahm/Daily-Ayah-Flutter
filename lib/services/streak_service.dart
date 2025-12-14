@@ -10,19 +10,50 @@ class StreakService {
   late Box<UserStats> _box;
   static const String _boxName = 'user_stats';
   static const String _statsKey = 'current_stats';
+  bool _isInitialized = false;
 
   Future<void> initialize() async {
+    // Return immediately if already initialized
+    if (_isInitialized) return;
+
     if (!Hive.isAdapterRegistered(5)) {
       Hive.registerAdapter(UserStatsAdapter());
     }
-    _box = await Hive.openBox<UserStats>(_boxName);
+
+    // Check if box is already open
+    if (Hive.isBoxOpen(_boxName)) {
+      _box = Hive.box<UserStats>(_boxName);
+    } else {
+      _box = await Hive.openBox<UserStats>(_boxName);
+    }
 
     if (!_box.containsKey(_statsKey)) {
       await _box.put(_statsKey, UserStats());
     }
+
+    _isInitialized = true;
   }
 
-  UserStats get stats => _box.get(_statsKey) ?? UserStats();
+  /// Check if service is initialized
+  bool get isInitialized => _isInitialized;
+
+  /// Get stats - will throw if not initialized. Use getStatsAsync for safe access.
+  UserStats get stats {
+    if (!_isInitialized) {
+      throw StateError(
+        'StreakService not initialized. Call initialize() first or use getStatsAsync()',
+      );
+    }
+    return _box.get(_statsKey) ?? UserStats();
+  }
+
+  /// Async safe getter that ensures initialization
+  Future<UserStats> getStatsAsync() async {
+    if (!_isInitialized) {
+      await initialize();
+    }
+    return _box.get(_statsKey) ?? UserStats();
+  }
 
   ValueListenable<Box<UserStats>> get listenable => _box.listenable();
 

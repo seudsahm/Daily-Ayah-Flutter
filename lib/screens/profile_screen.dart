@@ -20,8 +20,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   final StreakService _streakService = StreakService();
   final BadgeService _badgeService = BadgeService();
-  late UserStats _stats;
-  late List<model.Badge> _badges;
+  UserStats? _stats;
+  List<model.Badge>? _badges;
+  bool _isLoading = true;
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
 
@@ -37,7 +38,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       curve: Curves.easeOut,
     );
     _loadData();
-    _controller.forward();
   }
 
   @override
@@ -46,11 +46,17 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.dispose();
   }
 
-  void _loadData() {
-    setState(() {
-      _stats = _streakService.stats;
-      _badges = _badgeService.getAllBadges();
-    });
+  void _loadData() async {
+    // Use async getter to ensure StreakService is initialized
+    final stats = await _streakService.getStatsAsync();
+    if (mounted) {
+      setState(() {
+        _stats = stats;
+        _badges = _badgeService.getAllBadges();
+        _isLoading = false;
+      });
+      _controller.forward();
+    }
   }
 
   @override
@@ -90,40 +96,51 @@ class _ProfileScreenState extends State<ProfileScreen>
 
           // Islamic Pattern
           Positioned.fill(
-            child: CustomPaint(
-              painter: IslamicPatternPainter(
-                color: Colors.white,
-                opacity: 0.05,
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: IslamicPatternPainter(
+                  color: Colors.white,
+                  opacity: 0.05,
+                ),
               ),
             ),
           ),
 
           // Content
           SafeArea(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 20),
-                    _buildStreakHeader(colorScheme),
-                    const SizedBox(height: 30),
-                    _buildStatsGrid(theme),
-                    const SizedBox(height: 30),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: OrnamentalDivider(color: colorScheme.tertiary),
+            child: _isLoading
+                ? Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
                     ),
-                    const SizedBox(height: 30),
-                    _buildTrophyCase(theme),
-                    const SizedBox(height: 40),
-                    _buildJoinDate(),
-                    const SizedBox(height: 100), // Bottom padding
-                  ],
-                ),
-              ),
-            ),
+                  )
+                : FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 20),
+                          _buildStreakHeader(colorScheme),
+                          const SizedBox(height: 30),
+                          _buildStatsGrid(theme),
+                          const SizedBox(height: 30),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: OrnamentalDivider(
+                              color: colorScheme.tertiary,
+                            ),
+                          ),
+                          const SizedBox(height: 30),
+                          _buildTrophyCase(theme),
+                          const SizedBox(height: 40),
+                          _buildJoinDate(),
+                          const SizedBox(height: 100), // Bottom padding
+                        ],
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -171,7 +188,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   color: colorScheme.tertiary,
                 ),
                 Text(
-                  '${_stats.currentStreak}',
+                  '${_stats!.currentStreak}',
                   style: const TextStyle(
                     fontSize: 48,
                     fontWeight: FontWeight.bold,
@@ -209,7 +226,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildStatsGrid(ThemeData theme) {
-    final unlockedCount = _badges.where((b) => b.isUnlocked).length;
+    final unlockedCount = _badges!.where((b) => b.isUnlocked).length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -237,25 +254,25 @@ class _ProfileScreenState extends State<ProfileScreen>
             children: [
               _buildGlassStatCard(
                 'Total Days',
-                _stats.totalDaysOpened.toString(),
+                _stats!.totalDaysOpened.toString(),
                 Icons.calendar_today,
                 Colors.blue.shade300,
               ),
               _buildGlassStatCard(
                 'Badges',
-                '$unlockedCount/${_badges.length}',
+                '$unlockedCount/${_badges!.length}',
                 Icons.emoji_events,
                 Colors.amber.shade300,
               ),
               _buildGlassStatCard(
                 'Favorites',
-                _stats.totalFavorites.toString(),
+                _stats!.totalFavorites.toString(),
                 Icons.favorite,
                 Colors.red.shade300,
               ),
               _buildGlassStatCard(
                 'Ayahs Read',
-                _stats.totalAyahsRead.toString(),
+                _stats!.totalAyahsRead.toString(),
                 Icons.menu_book,
                 Colors.purple.shade300,
               ),
@@ -345,7 +362,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: categories.entries.map((entry) {
         final categoryBadges =
-            _badges.where((b) => b.category == entry.key).toList()
+            _badges!.where((b) => b.category == entry.key).toList()
               ..sort((a, b) => a.requiredValue.compareTo(b.requiredValue));
 
         if (categoryBadges.isEmpty) return const SizedBox.shrink();
@@ -454,7 +471,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
-          'Member since ${DateFormat.yMMMd().format(_stats.joinDate)}',
+          'Member since ${DateFormat.yMMMd().format(_stats!.joinDate)}',
           style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
         ),
       ),

@@ -12,7 +12,13 @@ class FavoritesService {
   /// Initialize the Hive box
   Future<void> initialize() async {
     if (_favoritesBox != null && _favoritesBox!.isOpen) return;
-    _favoritesBox = await Hive.openBox<FavoriteAyah>(_boxName);
+
+    // Check if box is already open
+    if (Hive.isBoxOpen(_boxName)) {
+      _favoritesBox = Hive.box<FavoriteAyah>(_boxName);
+    } else {
+      _favoritesBox = await Hive.openBox<FavoriteAyah>(_boxName);
+    }
   }
 
   /// Get listenable for reactive UI updates

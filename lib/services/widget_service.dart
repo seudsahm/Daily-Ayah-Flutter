@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
+import '../widgets/home_screen_widget.dart';
 
 import 'streak_service.dart';
 
@@ -12,27 +15,46 @@ class WidgetService {
     await updateWidget();
   }
 
-  /// Update widget with streak data
+  /// Update widget with streak and ayahs data
   Future<void> updateWidget() async {
     try {
-      // Get streak data
+      // Get streak data using async getter (ensures initialization)
       final streakService = StreakService();
-      await streakService.initialize();
-      final streak = streakService.stats.currentStreak;
+      final userStats = await streakService.getStatsAsync();
+      final streak = userStats.currentStreak;
+      final uniqueAyahsRead = userStats.readAyahIds.length;
 
-      // Save data for widget
-      await HomeWidget.saveWidgetData<String>(
-        'streak_count',
-        streak.toString(),
+      // Render the widget to an image
+      // Note: renderFlutterWidget renders the widget as a PNG image
+      final path = await HomeWidget.renderFlutterWidget(
+        DailyAyahHomeWidget(streak: streak, ayahsRead: uniqueAyahsRead),
+        key: 'widget_image',
+        logicalSize: const Size(330, 165),
+        pixelRatio: 3.0, // Ultra high quality
       );
-      await HomeWidget.saveWidgetData<String>('streak_label', 'Day Streak');
+
+      if (path != null) {
+        // Save the image path
+        await HomeWidget.saveWidgetData<String>('widget_image_path', path);
+      } else {
+        if (kDebugMode) {
+          print('Error rendering widget: Path is null');
+        }
+      }
 
       // Update widget
+      // We pass the class name of the Android WidgetProvider
       await HomeWidget.updateWidget(androidName: 'DailyAyahWidgetProvider');
 
-      print('Widget updated successfully with streak: $streak');
+      if (kDebugMode) {
+        print(
+          'Widget updated - Streak: $streak, Ayahs: $uniqueAyahsRead, Path: $path',
+        );
+      }
     } catch (e) {
-      print('Error updating widget: $e');
+      if (kDebugMode) {
+        print('Error updating widget: $e');
+      }
     }
   }
 
@@ -40,6 +62,8 @@ class WidgetService {
   static Future<void> onWidgetTapped(Uri? uri) async {
     // The app will open automatically when widget is tapped
     // This method can be used for custom navigation if needed
-    print('Widget tapped: $uri');
+    if (kDebugMode) {
+      print('Widget tapped: $uri');
+    }
   }
 }

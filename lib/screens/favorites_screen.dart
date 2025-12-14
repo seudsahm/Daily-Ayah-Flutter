@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'dart:ui';
 import '../models/favorite_ayah.dart';
 import '../services/favorites_service.dart';
 import '../services/share_service.dart';

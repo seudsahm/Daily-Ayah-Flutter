@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/app_settings.dart';
@@ -30,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isLoading = true;
   String _errorMessage = '';
   bool _isFavorite = false;
-  int _totalAyahs = 6236;
+  final int _totalAyahs = 6236;
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
@@ -89,15 +88,31 @@ class _HomeScreenState extends State<HomeScreen>
       _errorMessage = '';
     });
     try {
-      // Open settings box to check for persisted ayah
-      final settingsBox = await Hive.openBox<AppSettings>('settings');
-      final settings = settingsBox.get('app_settings') ?? AppSettings();
+      // Get settings box (should already be open from main.dart initialization)
+      Box<AppSettings> settingsBox;
+      if (Hive.isBoxOpen('settings')) {
+        settingsBox = Hive.box<AppSettings>('settings');
+      } else {
+        settingsBox = await Hive.openBox<AppSettings>('settings');
+      }
+
+      // Get existing settings or create new one if not exists
+      AppSettings settings;
+      if (settingsBox.containsKey('app_settings')) {
+        settings = settingsBox.get('app_settings')!;
+      } else {
+        settings = AppSettings();
+        await settingsBox.put('app_settings', settings);
+      }
+
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
 
       // Check if we already have a saved ayah for today
       if (settings.lastDailyAyahDate != null &&
-          settings.lastDailyAyahDate!.isAtSameMomentAs(today) &&
+          settings.lastDailyAyahDate!.year == today.year &&
+          settings.lastDailyAyahDate!.month == today.month &&
+          settings.lastDailyAyahDate!.day == today.day &&
           settings.lastDailyAyahSurahId != null &&
           settings.lastDailyAyahAyahId != null) {
         // Load the persisted ayah
@@ -114,8 +129,9 @@ class _HomeScreenState extends State<HomeScreen>
 
       // If no persisted ayah or not for today, get a new unique one
       final streakService = StreakService();
-      await streakService.initialize();
-      final readIds = streakService.stats.readAyahIds;
+      // Use async getter to ensure service is initialized
+      final userStats = await streakService.getStatsAsync();
+      final readIds = userStats.readAyahIds;
       final ayah = await _ayahSelectorService.getUniqueAyahOfTheDay(readIds);
 
       // Save this ayah as today's ayah
@@ -167,12 +183,19 @@ class _HomeScreenState extends State<HomeScreen>
     });
     try {
       final streakService = StreakService();
-      await streakService.initialize();
-      final readIds = streakService.stats.readAyahIds;
+      // Use async getter to ensure service is initialized
+      final userStats = await streakService.getStatsAsync();
+      final readIds = userStats.readAyahIds;
       final ayah = await _ayahSelectorService.getUniqueRandomAyah(readIds);
 
-      // Update the persisted ayah to this new random one so it stays if app is reloaded
-      final settingsBox = await Hive.openBox<AppSettings>('settings');
+      // Update the persisted ayah - use proper Hive box access
+      Box<AppSettings> settingsBox;
+      if (Hive.isBoxOpen('settings')) {
+        settingsBox = Hive.box<AppSettings>('settings');
+      } else {
+        settingsBox = await Hive.openBox<AppSettings>('settings');
+      }
+
       final settings = settingsBox.get('app_settings');
       if (settings != null) {
         final now = DateTime.now();
@@ -446,10 +469,12 @@ class _HomeScreenState extends State<HomeScreen>
 
           // Islamic Geometric Pattern Background
           Positioned.fill(
-            child: CustomPaint(
-              painter: IslamicPatternPainter(
-                color: Colors.white,
-                opacity: 0.08,
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: IslamicPatternPainter(
+                  color: Colors.white,
+                  opacity: 0.08,
+                ),
               ),
             ),
           ),

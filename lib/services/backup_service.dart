@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'favorites_service.dart';
-import '../models/favorite_ayah.dart';
-import '../models/ayah_with_surah.dart';
 import '../services/ayah_selector_service.dart';
 import '../services/streak_service.dart';
 import '../services/badge_service.dart';
@@ -108,8 +106,12 @@ class BackupService {
 
           // Verify ayah exists
           try {
-            final ayahWithSurah = _ayahSelectorService.getAyah(surahId, ayahId);
-            if (!_favoritesService.isFavorite(surahId, ayahId)) {
+            final ayahWithSurah = await _ayahSelectorService.getSpecificAyah(
+              surahId,
+              ayahId,
+            );
+            if (ayahWithSurah != null &&
+                !_favoritesService.isFavorite(surahId, ayahId)) {
               await _favoritesService.addFavorite(ayahWithSurah);
               importedCount++;
             }

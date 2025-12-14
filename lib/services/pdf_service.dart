@@ -1,5 +1,3 @@
-import 'dart:io';
-import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -18,11 +16,11 @@ class PdfService {
   Future<void> generateAndShareWeeklyDigest() async {
     final pdf = pw.Document();
 
-    // Load data
-    await _streakService.initialize();
+    // Load data using async getter (ensures initialization)
     await _favoritesService.initialize();
+    final stats = await _streakService.getStatsAsync();
 
-    final recentAyahIds = _streakService.stats.recentAyahIds;
+    final recentAyahIds = stats.recentAyahIds;
     final recentAyahs = <AyahWithSurah>[];
 
     for (var id in recentAyahIds) {
@@ -32,24 +30,28 @@ class PdfService {
         final ayahId = int.tryParse(parts[1]);
         if (surahId != null && ayahId != null) {
           try {
-            recentAyahs.add(_ayahSelectorService.getAyah(surahId, ayahId));
+            final ayah = await _ayahSelectorService.getSpecificAyah(
+              surahId,
+              ayahId,
+            );
+            if (ayah != null) recentAyahs.add(ayah);
           } catch (_) {}
         }
       }
     }
 
-    final favorites = _favoritesService
-        .getAllFavorites()
-        .take(5)
-        .map((f) {
-          try {
-            return _ayahSelectorService.getAyah(f.surahId, f.ayahId);
-          } catch (_) {
-            return null;
-          }
-        })
-        .whereType<AyahWithSurah>()
-        .toList();
+    final favoriteItems = _favoritesService.getAllFavorites().take(5);
+    final favorites = <AyahWithSurah>[];
+
+    for (var f in favoriteItems) {
+      try {
+        final ayah = await _ayahSelectorService.getSpecificAyah(
+          f.surahId,
+          f.ayahId,
+        );
+        if (ayah != null) favorites.add(ayah);
+      } catch (_) {}
+    }
 
     // Load fonts
     final font = await PdfGoogleFonts.amiriRegular();

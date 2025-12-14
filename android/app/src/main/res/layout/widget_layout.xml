@@ -1,53 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp"
-    android:background="@drawable/widget_background"
-    android:gravity="center">
+    android:padding="0dp">
 
-    <!-- Flame Icon -->
     <ImageView
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:src="@android:drawable/ic_lock_idle_low_battery" 
-        android:tint="#FFD700"
-        android:layout_marginBottom="4dp" />
+        android:id="@+id/widget_image_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="Daily Ayah Widget"
+        android:scaleType="fitCenter" />
 
-    <!-- Streak Count -->
-    <TextView
-        android:id="@+id/widget_streak_count"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="0"
-        android:textSize="42sp"
-        android:textColor="#FFFFFF"
-        android:textStyle="bold"
-        android:includeFontPadding="false"
-        android:gravity="center" />
-
-    <!-- Label -->
-    <TextView
-        android:id="@+id/widget_streak_label"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Day Streak"
-        android:textSize="14sp"
-        android:textColor="#FFFFFF"
-        android:alpha="0.9"
-        android:textStyle="bold"
-        android:gravity="center" />
-
-    <!-- Motivational Text -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Keep it up!"
-        android:textSize="12sp"
-        android:textColor="#FFFFFF"
-        android:alpha="0.7"
-        android:layout_marginTop="4dp"
-        android:gravity="center" />
-
-</LinearLayout>
+</FrameLayout>

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:intl/intl.dart';
 import '../models/badge.dart' as model;
 

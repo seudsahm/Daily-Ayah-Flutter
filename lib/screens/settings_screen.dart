@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:home_widget/home_widget.dart';
-import 'dart:ui';
 import '../models/app_settings.dart';
 import '../services/notification_service.dart';
 import '../services/widget_service.dart';
@@ -35,7 +34,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    _settingsBox = await Hive.openBox<AppSettings>(_settingsBoxName);
+    // Use Hive.isBoxOpen to reuse already open box
+    if (Hive.isBoxOpen(_settingsBoxName)) {
+      _settingsBox = Hive.box<AppSettings>(_settingsBoxName);
+    } else {
+      _settingsBox = await Hive.openBox<AppSettings>(_settingsBoxName);
+    }
 
     setState(() {
       _settings = _settingsBox!.get(_settingsKey);
@@ -347,7 +351,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: _toggleNotifications,
             title: const Text('Daily Reminders'),
             subtitle: const Text('Get notified to read your daily ayah'),
-            activeColor: theme.colorScheme.primary,
+            activeThumbColor: theme.colorScheme.primary,
             secondary: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -401,6 +405,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
+            Divider(height: 1, color: theme.dividerColor.withOpacity(0.1)),
+            ListTile(
+              onTap: () async {
+                await _notificationService.showTestNotification();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Test notification sent! Check notification bar.',
+                      ),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.send,
+                  size: 20,
+                  color: theme.colorScheme.secondary,
+                ),
+              ),
+              title: const Text('Test Notification'),
+              subtitle: const Text('Send a test notification now'),
+            ),
           ],
           Divider(height: 1, color: theme.dividerColor.withOpacity(0.1)),
           SwitchListTile(
@@ -408,7 +442,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: _toggleQuickGlance,
             title: const Text('Quick Glance'),
             subtitle: const Text('Persistent notification for easy access'),
-            activeColor: theme.colorScheme.primary,
+            activeThumbColor: theme.colorScheme.primary,
             secondary: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(

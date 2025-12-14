@@ -1,4 +1,5 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/badge.dart';
 import 'streak_service.dart';
@@ -11,15 +12,36 @@ class BadgeService {
   late Box<Badge> _box;
   static const String _boxName = 'badges';
   final StreakService _streakService = StreakService();
+  bool _isInitialized = false;
+
+  final _unlockController = StreamController<List<Badge>>.broadcast();
+  Stream<List<Badge>> get onUnlocks => _unlockController.stream;
+
+  void dispose() {
+    _unlockController.close();
+  }
 
   Future<void> initialize() async {
+    // Return immediately if already initialized
+    if (_isInitialized) return;
+
     if (!Hive.isAdapterRegistered(6)) {
       Hive.registerAdapter(BadgeAdapter());
     }
-    _box = await Hive.openBox<Badge>(_boxName);
 
-    // Always check for new badge definitions to ensure updates are applied
-    await _initializeBadges();
+    // Check if box is already open
+    if (Hive.isBoxOpen(_boxName)) {
+      _box = Hive.box<Badge>(_boxName);
+    } else {
+      _box = await Hive.openBox<Badge>(_boxName);
+    }
+
+    // Only initialize badges if the box is empty (first time)
+    if (_box.isEmpty) {
+      await _initializeBadges();
+    }
+
+    _isInitialized = true;
   }
 
   List<Badge> getAllBadges() {
@@ -541,20 +563,20 @@ class BadgeService {
       ),
     ];
 
-    // Clear existing badges to remove duplicates and ensure consistency
-    await _box.clear();
-
-    // Add all badges fresh
+    // Only add badges that don't exist yet (preserve user progress)
     for (var badge in badges) {
-      await _box.put(badge.id, badge);
+      if (!_box.containsKey(badge.id)) {
+        await _box.put(badge.id, badge);
+      }
     }
 
-    // Re-check unlocks to restore user progress based on stats
+    // Check for unlocks after initialization
     await checkNewUnlocks();
   }
 
   Future<List<Badge>> checkNewUnlocks() async {
-    final stats = _streakService.stats;
+    // Use async getter to ensure StreakService is initialized
+    final stats = await _streakService.getStatsAsync();
     final newUnlocks = <Badge>[];
 
     for (var badge in _box.values) {
@@ -576,8 +598,9 @@ class BadgeService {
           if (stats.totalShares >= badge.requiredValue) unlocked = true;
           break;
         case 'special':
-          if (badge.id == 'special_pdf' && stats.totalPDFsGenerated >= 1)
+          if (badge.id == 'special_pdf' && stats.totalPDFsGenerated >= 1) {
             unlocked = true;
+          }
           // Other special badges (early/night/weekend) are triggered manually
           break;
       }
@@ -590,6 +613,9 @@ class BadgeService {
       }
     }
 
+    if (newUnlocks.isNotEmpty) {
+      _unlockController.add(newUnlocks);
+    }
     return newUnlocks;
   }
 }

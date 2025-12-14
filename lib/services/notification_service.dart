@@ -1,6 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/data/latest_all.dart' as tzdata;
+import 'package:flutter/foundation.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -11,13 +12,44 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
+  tz.Location? _localTimezone;
 
   /// Initialize the notification service
   Future<void> initialize() async {
     if (_initialized) return;
 
-    // Initialize timezone
-    tz.initializeTimeZones();
+    // Initialize timezone database
+    tzdata.initializeTimeZones();
+
+    // Try to detect device timezone, fallback to Africa/Addis_Ababa for Ethiopia
+    try {
+      // Get device's timezone offset
+      final now = DateTime.now();
+      final offset = now.timeZoneOffset;
+
+      // Find timezone that matches the offset (Ethiopia is +3:00)
+      if (offset.inHours == 3 && offset.inMinutes % 60 == 0) {
+        _localTimezone = tz.getLocation('Africa/Addis_Ababa');
+      } else {
+        // Try to find matching timezone by offset
+        _localTimezone = _findTimezoneByOffset(offset);
+      }
+
+      tz.setLocalLocation(_localTimezone!);
+
+      if (kDebugMode) {
+        print(
+          'Timezone set to: ${_localTimezone!.name} (offset: ${offset.inHours}h ${offset.inMinutes % 60}m)',
+        );
+      }
+    } catch (e) {
+      // Fallback to UTC if timezone detection fails
+      _localTimezone = tz.getLocation('Africa/Addis_Ababa');
+      tz.setLocalLocation(_localTimezone!);
+      if (kDebugMode) {
+        print('Timezone detection failed, using Africa/Addis_Ababa: $e');
+      }
+    }
 
     // Android initialization settings
     const androidSettings = AndroidInitializationSettings(
@@ -34,11 +66,38 @@ class NotificationService {
     _initialized = true;
   }
 
+  /// Find timezone by offset
+  tz.Location _findTimezoneByOffset(Duration offset) {
+    // Common timezones by offset
+    final timezoneMap = {
+      3: 'Africa/Addis_Ababa', // Ethiopia, Kenya, etc.
+      0: 'UTC',
+      1: 'Europe/Paris',
+      2: 'Europe/Athens',
+      4: 'Asia/Dubai',
+      5: 'Asia/Karachi',
+      6: 'Asia/Dhaka',
+      7: 'Asia/Bangkok',
+      8: 'Asia/Singapore',
+      9: 'Asia/Tokyo',
+      -5: 'America/New_York',
+      -6: 'America/Chicago',
+      -7: 'America/Denver',
+      -8: 'America/Los_Angeles',
+    };
+
+    final hours = offset.inHours;
+    final tzName = timezoneMap[hours] ?? 'UTC';
+    return tz.getLocation(tzName);
+  }
+
   /// Handle notification tap
   void _onNotificationTapped(NotificationResponse response) {
     // Navigation will be handled by the app when it opens
     // The payload can be used to determine which screen to show
-    print('Notification tapped: ${response.payload}');
+    if (kDebugMode) {
+      print('Notification tapped: ${response.payload}');
+    }
   }
 
   /// Request notification permissions (Android 13+)
@@ -107,13 +166,22 @@ class NotificationService {
       payload: 'today_screen',
     );
 
-    print('Notification scheduled for $hour:$minute');
+    if (kDebugMode) {
+      final formattedHour = hour.toString().padLeft(2, '0');
+      final formattedMinute = minute.toString().padLeft(2, '0');
+      print(
+        'Notification scheduled for $formattedHour:$formattedMinute (${_localTimezone?.name ?? "local"})',
+      );
+      print('Next notification at: $scheduledDate');
+    }
   }
 
   /// Cancel all scheduled notifications
   Future<void> cancelAllNotifications() async {
     await _notifications.cancelAll();
-    print('All notifications cancelled');
+    if (kDebugMode) {
+      print('All notifications cancelled');
+    }
   }
 
   /// Show a test notification immediately

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'dart:ui';
 import '../models/collection.dart';
 import '../services/collections_service.dart';
 import 'collection_detail_screen.dart';

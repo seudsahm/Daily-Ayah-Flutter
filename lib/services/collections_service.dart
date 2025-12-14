@@ -13,7 +13,13 @@ class CollectionsService {
 
   Future<void> initialize() async {
     if (_collectionsBox != null && _collectionsBox!.isOpen) return;
-    _collectionsBox = await Hive.openBox<Collection>(_boxName);
+
+    // Check if box is already open
+    if (Hive.isBoxOpen(_boxName)) {
+      _collectionsBox = Hive.box<Collection>(_boxName);
+    } else {
+      _collectionsBox = await Hive.openBox<Collection>(_boxName);
+    }
   }
 
   /// Get all collections
